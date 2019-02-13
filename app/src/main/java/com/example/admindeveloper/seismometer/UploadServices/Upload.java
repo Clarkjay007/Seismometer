@@ -5,6 +5,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
@@ -22,6 +26,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,7 +42,7 @@ import java.io.File;
 import java.util.UUID;
 
 
-public class Upload extends Fragment implements View.OnClickListener {
+public class Upload extends Fragment implements View.OnClickListener, SensorEventListener {
     View myView;
 
     //Declaring views
@@ -50,6 +55,7 @@ public class Upload extends Fragment implements View.OnClickListener {
 
     private EditText editText , ipadress;
     private TextView timertv;
+    private ImageView wifi_status;
     Handler handler;
     public String UPLOAD_URL ;
 
@@ -65,6 +71,7 @@ public class Upload extends Fragment implements View.OnClickListener {
     private Uri filePath;
 
     ZipManager zipManager = new ZipManager();
+    private SensorManager sensorManager;
 
     @Nullable
     @Override
@@ -72,6 +79,8 @@ public class Upload extends Fragment implements View.OnClickListener {
         myView = inflater.inflate(R.layout.uploadlayout,container,false);
         //Requesting storage permission
         requestStoragePermission();
+        sensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
+        sensorManager.registerListener(this,sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_GAME);
 
         //Initializing views
         buttonChoose =  myView.findViewById(R.id.buttonChoose);
@@ -80,6 +89,7 @@ public class Upload extends Fragment implements View.OnClickListener {
         buttonDelete =  myView.findViewById(R.id.buttondelete);
         buttonStart = myView.findViewById(R.id.buttonstart);
         buttonStop = myView.findViewById(R.id.buttonstop);
+        wifi_status = myView.findViewById(R.id.wifi_status);
         handler = new Handler();
 
         timertv = myView.findViewById(R.id.stopwatchtv);
@@ -305,7 +315,6 @@ public class Upload extends Fragment implements View.OnClickListener {
         if(v == buttonDelete){
             ConnectivityManager connManager = (ConnectivityManager) getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
             NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-
             if (mWifi.isConnected()) {
                 Toast.makeText(getActivity(),"wifi connected",Toast.LENGTH_SHORT).show();
             }else{
@@ -381,6 +390,30 @@ public class Upload extends Fragment implements View.OnClickListener {
 
         }
         return null;*/
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent sensorEvent) {
+        ConnectivityManager connManager = (ConnectivityManager) getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+        timertv.setText(""+sensorEvent.values[0]);
+        if (mWifi.isConnected()) {
+            //Toast.makeText(getActivity(),"wifi connected",Toast.LENGTH_SHORT).show();
+            wifi_status.setImageResource(R.drawable.wifi_connected);
+        }else{
+            //Toast.makeText(getActivity(),"Not connected",Toast.LENGTH_SHORT).show();
+            wifi_status.setImageResource(R.drawable.wifi_not_connected);
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int i) {
+
+    }
+    @Override
+    public void onPause() {
+        super.onPause();
+        sensorManager.unregisterListener(this);
     }
 //endregion
 
