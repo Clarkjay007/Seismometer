@@ -77,7 +77,6 @@ public class RecordSaveData {
                 bw.write(hold + "," + hold + "," + hold + ",#hour minute,\r\n");
                 bw.write(second + "," + second + "," + second + ",#second,\r\n");
                 bw.write(samplePerSecond + "," + samplePerSecond + "," + samplePerSecond + ",#samples per second,\r\n");
-              //  bw.write(sum_of_samples + "," + sum_of_samples + "," + sum_of_samples + ",#number of samples,\r\n");
                 bw.write("0,0,0,#sync,\r\n");
                 bw.write(",,,#sync source,\r\n");
                 bw.write("g,g,g,g,\r\n");
@@ -98,13 +97,6 @@ public class RecordSaveData {
             fos.flush();
             fos.close();
             return "Success";
-            /*fos.notifyAll();
-            x_values.clear();
-            y_values.clear();
-            z_values.clear();
-            file.notifyAll();
-            myDir.notifyAll();*/
-
         }
         catch (Exception e)
         {

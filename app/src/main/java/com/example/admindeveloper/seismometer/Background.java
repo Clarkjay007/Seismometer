@@ -32,7 +32,10 @@ import net.gotev.uploadservice.UploadInfo;
 import net.gotev.uploadservice.UploadNotificationConfig;
 import net.gotev.uploadservice.UploadStatusDelegate;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.UUID;
@@ -68,6 +71,7 @@ public class Background extends Service implements SensorEventListener {
     String longitude;
     String latitutde;
     String compass;
+    String location;
 
     private LocationManager locationManager;
     private LocationListener locationListener;
@@ -75,7 +79,8 @@ public class Background extends Service implements SensorEventListener {
     Runnable runnable;
     long resettime=0;
 
-
+    Boolean mystart = true;
+    Boolean myexit = false;
     @SuppressLint("MissingPermission")
     @Override
     public void onCreate() {
@@ -122,9 +127,10 @@ public class Background extends Service implements SensorEventListener {
         StartTime = SystemClock.uptimeMillis();
         ipaddress = intent.getStringExtra("ipaddress");
 
-        Toast.makeText(getApplication(), ipaddress, Toast.LENGTH_SHORT).show();
-        Toast.makeText(getApplication(), intent.getStringExtra("location"), Toast.LENGTH_SHORT).show();
-        Toast.makeText(getApplication(), intent.getStringExtra("device"), Toast.LENGTH_SHORT).show();
+        //Toast.makeText(getApplication(), ipaddress, Toast.LENGTH_SHORT).show();
+        //Toast.makeText(getApplication(), intent.getStringExtra("location"), Toast.LENGTH_SHORT).show();
+        location = intent.getStringExtra("location");
+        //Toast.makeText(getApplication(), intent.getStringExtra("device"), Toast.LENGTH_SHORT).show();
         csvnames = new ArrayList<>();
         zipManager = new ZipManager();
         extras = new Bundle();
@@ -146,54 +152,24 @@ public class Background extends Service implements SensorEventListener {
         //endregion
 
         //region ---------------------(HANDLER) Special Delay Call (Infinite Loop in an definite delay)--------------------
-
+        Calendar setnamedate1 = Calendar.getInstance();
+        fileName = setnamedate1.get(Calendar.YEAR) + "-" + (setnamedate1.get(Calendar.MONTH)+1)  + "-" + setnamedate1.get(Calendar.DATE)  + "-" + setnamedate1.get(Calendar.HOUR_OF_DAY)  + "-" + setnamedate1.get(Calendar.MINUTE)  + "-" + setnamedate1.get(Calendar.SECOND)  + ".csv";
+        csvnames.add(fileName);
                 runnable = new Runnable() {
                     @Override
                     public void run() {
-                        // ------------- Set Up -----------
-                        String status;
-                        resettime = SystemClock.uptimeMillis();
-                       // Toast.makeText(getApplicationContext(), "Saving in Progress", Toast.LENGTH_SHORT).show();
-                        if(iappendctr == 0 && !append) {
-                            compressionflag = false;
-                            Calendar setnamedate = Calendar.getInstance();
-                            fileName = setnamedate.get(Calendar.YEAR) + "-" + (setnamedate.get(Calendar.MONTH)+1)  + "-" + setnamedate.get(Calendar.DATE)  + "-" + setnamedate.get(Calendar.HOUR_OF_DAY)  + "-" + setnamedate.get(Calendar.MINUTE)  + "-" + setnamedate.get(Calendar.SECOND)  + ".csv";
-                        }
-                        // -------------- Save / Clear -------------
-                        if(iappendctr+1 >= limitappend) {
-                            compressionflag = true;
-                        }
-                            status = recordSaveData1.saveEarthquakeData("0", fileName, longitude, latitutde, compass, append , iappendctr, limitappend);      // saving Data to a specific Location (Samples)
 
+                        //somechanges---
 
-                        Toast.makeText(getApplicationContext(), status, Toast.LENGTH_SHORT).show();
-                        switch (status){
-                            case "Success":{
-                                recordSaveData1.clearData();          // deleting recorded data
-                                append = true;
-                                iappendctr++;
-                                if(iappendctr >= limitappend) {
-                                    csvnames.add(fileName);
-                                    iappendctr = 0;
-                                    append = false;
-                                }
-
-                                //------------------ Initialize Delay for the next Call -----------------
-                                Calendar settime = Calendar.getInstance();
-                                 sec = (60 - settime.get(Calendar.SECOND)) * 1000; // seconds delay for minute
-
-                                // ----------------- Recursive Call --------------------------
-                                handler.postDelayed(this, sec);
-                                break;
-                            }
-                            case "Error":{
-                                handler.postDelayed(this, 0);
-                                break;
-                            }
-                            default:{
-                                break;
-                            }
-                        }
+                        Calendar setnamedate = Calendar.getInstance();
+                        fileName = setnamedate.get(Calendar.YEAR) + "-" + (setnamedate.get(Calendar.MONTH)+1)  + "-" + setnamedate.get(Calendar.DATE)  + "-" + setnamedate.get(Calendar.HOUR_OF_DAY)  + "-" + setnamedate.get(Calendar.MINUTE)  + "-" + setnamedate.get(Calendar.SECOND)  + ".csv";
+                        csvnames.add(fileName);
+                        //------------------ Initialize Delay for the next Call -----------------
+                        Calendar settime = Calendar.getInstance();
+                        sec = (60 - settime.get(Calendar.SECOND)) * 1000; // seconds delay for minute
+                        myexit = true;
+                        // ----------------- Recursive Call --------------------------
+                        handler.postDelayed(this, sec);
                     }
                 };
                 handler.postDelayed(runnable, sec); // calling handler for infinite loop
@@ -211,7 +187,7 @@ public class Background extends Service implements SensorEventListener {
                        public void run() {
                           // Toast.makeText(getBaseContext(), file + " was saved!", Toast.LENGTH_SHORT).show();
                            zipManager.compressGzipFile("Samples/" + file,  file + ".gz");  // Compressing Data
-
+                            compressionflag = false;
                        }
                    });
                }
@@ -230,7 +206,7 @@ public class Background extends Service implements SensorEventListener {
                         @Override
                         public void run() {
                            // Toast.makeText(getBaseContext(), file + " was compressed!", Toast.LENGTH_SHORT).show();
-                            for(int ictr=0 ; ictr<csvnames.size() ; ictr++) {
+                            for(int ictr=0 ; ictr<csvnames.size()-1 ; ictr++) {
                                uploadMultipart("/storage/emulated/0/Zip/" + csvnames.get(ictr) + ".gz", csvnames.get(ictr),ictr);
                              }
 
@@ -259,7 +235,8 @@ public class Background extends Service implements SensorEventListener {
 
     }
 
-
+    FileOutputStream fos;
+    BufferedWriter bw;
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
         if (sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
@@ -267,7 +244,78 @@ public class Background extends Service implements SensorEventListener {
             time = ""+(SystemClock.uptimeMillis()-resettime);
 
             realTimeController.updateXYZ(sensorEvent.values[0], sensorEvent.values[1], sensorEvent.values[2]);
-            recordSaveData1.recordData(realTimeController.getX(), realTimeController.getY(), realTimeController.getZ(), time);
+           // recordSaveData1.recordData(realTimeController.getX(), realTimeController.getY(), realTimeController.getZ(), time);
+
+            try {
+                if(mystart){
+                    File myDir = new File("storage/emulated/0/Samples");
+                    if(!myDir.exists())
+                    {
+                        myDir.mkdirs();
+                    }
+                    File file = new File(myDir,fileName);
+                    file.createNewFile();
+                    fos = new FileOutputStream(file);
+                    bw = new BufferedWriter(new OutputStreamWriter(fos));
+                    bw.write("ARRIVALS,,,,\r\n");
+                    bw.write("#sitename,,,,\r\n");
+                    bw.write("#onset,,,,\r\n");
+                    bw.write("#first motion,,,,\r\n");
+                    bw.write("#phase,,,,\r\n");
+                    bw.write("#year month day,,,,\r\n");
+                    bw.write("#hour minute,,,,\r\n");
+                    bw.write("#second,,,,\r\n");
+                    bw.write("#uncertainty in seconds,,,,\r\n");
+                    bw.write("#peak amplitude,,,,\r\n");
+                    bw.write("#frequency at P phase,,,,\r\n");
+                    bw.write(",,,,\r\n");
+                    bw.write("longitude : " + longitude + "\r\n");
+                    bw.write("latitude : " + latitutde + "\r\n");
+                    bw.write("compass : " + compass + "\r\n");
+                    bw.write("TIME SERIES,,,,\r\n");
+                    bw.write("LLPS,LLPS,LLPS,#sitename,\r\n");
+                    bw.write("EHE _,EHN _,EHZ _,#component,\r\n");
+                    bw.write(0 + "," + 0 + "," + 0 + ",#authority,\r\n");
+                    String[] separated = fileName.split("[-|.]");
+                    String year = separated[0];
+                    String month = separated[1];
+                    String day = separated[2];
+                    String hour = separated[3];
+                    String minute = separated[4];
+                    String second = separated[5];
+                    String hold = year;
+                    hold = Integer.parseInt(month) <= 9 ? hold + "0" + Integer.parseInt(month) : hold + Integer.parseInt(month);
+                    hold = Integer.parseInt(day) <= 9 ? hold + "0" + Integer.parseInt(day) : "" + hold + Integer.parseInt(day);
+                    bw.write(hold + "," + hold + "," + hold + ",#year month day,\r\n");
+                    hold = hour;
+                    hold = Integer.parseInt(minute) <= 9 ? hold + "0" + Integer.parseInt(minute) : "" + hold + Integer.parseInt(minute);
+                    bw.write(hold + "," + hold + "," + hold + ",#hour minute,\r\n");
+                    bw.write(second + "," + second + "," + second + ",#second,\r\n");
+                    bw.write("0,0,0,#sync,\r\n");
+                    bw.write(",,,#sync source,\r\n");
+                    bw.write("g,g,g,g,\r\n");
+                    bw.write("--------,--------,--------,,\r\n");
+                    Toast.makeText(this, "has been started", Toast.LENGTH_SHORT).show();
+                    mystart = false;
+                }
+                bw.write(realTimeController.getX()+","+realTimeController.getY()+","+realTimeController.getZ()+"\r\n");
+                if(myexit) {
+                    compressionflag = true;
+                    bw.write("       ,       ,       ,,\r\n" +
+                            "       ,       ,       ,,\r\n" +
+                            "END,END,END,,\r\n");
+                    bw.flush();
+                    bw.close();
+                    fos.flush();
+                    fos.close();
+                    myexit = false;
+                    mystart = true;
+                    Toast.makeText(this, "has been saved", Toast.LENGTH_SHORT).show();
+                }
+            }catch (Exception e){
+                e.printStackTrace();
+                Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
             i.putExtra("valueX", String.valueOf(realTimeController.getX()));
             i.putExtra("valueY", String.valueOf(realTimeController.getY()));
             i.putExtra("valueZ", String.valueOf(realTimeController.getZ()));
@@ -290,7 +338,6 @@ public class Background extends Service implements SensorEventListener {
         UPLOAD_URL = "http://"+ipaddress+"/data/api/uploaddata.php";
         //String name=(currentTime.getYear()+1900)+"-"+(currentTime.getMonth()+1)+"-"+currentTime.getDate()+"-"+currentTime.getHours()+currentTime.getMinutes()+"-"+currentTime.getSeconds()+".csv";
         String[] separated = name.split("[-|.]");
-        String location = "Lapulapu";
         String year = separated[0];
         String month = separated[1];
         String day = separated[2];
